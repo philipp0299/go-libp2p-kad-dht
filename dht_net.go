@@ -2,6 +2,7 @@ package dht
 
 import (
 	"io"
+	"strings"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/network"
@@ -104,8 +105,18 @@ func (dht *IpfsDHT) handleNewMessage(s network.Stream) bool {
 		}
 
 		if c := baseLogger.Check(zap.DebugLevel, "handling message"); c != nil {
+			multiAddrs := s.Conn().RemoteMultiaddr()
+
+			var b strings.Builder
+			for _, multiAddr := range multiAddrs {
+				b.WriteString(multiAddr.String())
+				b.WriteByte(' ')
+			}
+			multiAddrsString := b.String()
+
 			c.Write(zap.String("from", mPeer.String()),
 				zap.Int32("type", int32(req.GetType())),
+				zap.String("multi_addrs", multiAddrsString),
 				zap.Binary("key", req.GetKey()))
 		}
 		resp, err := handler(ctx, mPeer, &req)
