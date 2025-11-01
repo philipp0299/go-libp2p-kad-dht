@@ -563,6 +563,7 @@ func (dht *IpfsDHT) findProvidersAsyncRoutine(ctx context.Context, key multihash
 		}
 	}
 
+	totalProviderEntriesFound := 0
 	lookupRes, err := dht.runLookupWithFollowup(ctx, string(key),
 		func(ctx context.Context, p peer.ID) ([]*peer.AddrInfo, error) {
 			// For DHT query command
@@ -573,10 +574,12 @@ func (dht *IpfsDHT) findProvidersAsyncRoutine(ctx context.Context, key multihash
 
 			provs, closest, err := dht.protoMessenger.GetProviders(ctx, p, key)
 			if err != nil {
+				logger.Debugf("%d total provider entries found (CUSTOM): ", totalProviderEntriesFound)
 				return nil, err
 			}
 
 			logger.Debugf("%d provider entries", len(provs))
+			totalProviderEntriesFound += len(provs)
 
 			// Add unique providers from request, up to 'count'
 			for _, prov := range provs {
@@ -593,11 +596,13 @@ func (dht *IpfsDHT) findProvidersAsyncRoutine(ctx context.Context, key multihash
 						))
 					case <-ctx.Done():
 						logger.Debug("context timed out sending more providers")
+						logger.Debugf("%d total provider entries found (CUSTOM): ", totalProviderEntriesFound)
 						return nil, ctx.Err()
 					}
 				}
 				if !findAll && psSize() >= count {
 					logger.Debugf("got enough providers (%d/%d)", psSize(), count)
+					logger.Debugf("%d total provider entries found (CUSTOM): ", totalProviderEntriesFound)
 					return nil, nil
 				}
 			}
@@ -611,13 +616,16 @@ func (dht *IpfsDHT) findProvidersAsyncRoutine(ctx context.Context, key multihash
 				Responses: closest,
 			})
 
+			logger.Debugf("%d total provider entries found (CUSTOM): ", totalProviderEntriesFound)
 			return closest, nil
 		},
 		func(*qpeerset.QueryPeerset) bool {
+			logger.Debugf("%d total provider entries found (CUSTOM): ", totalProviderEntriesFound)
 			return !findAll && psSize() >= count
 		},
 	)
 
+	logger.Debugf("%d total provider entries found (CUSTOM): ", totalProviderEntriesFound)
 	if err == nil && ctx.Err() == nil {
 		dht.refreshRTIfNoShortcut(kb.ConvertKey(string(key)), lookupRes)
 	}
